@@ -1,0 +1,5 @@
+Flask==3.0.3
+openai==0.28
+requests==2.31.0
+python-dotenv==1.0.1
+PyMuPDF==1.23.22
