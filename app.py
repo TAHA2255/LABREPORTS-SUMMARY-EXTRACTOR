@@ -155,6 +155,104 @@ def analyze_pdf_text(pdf_url):
     except Exception as e:
         return {"error": str(e)}
 
+
+
+
+# ----------------- NEW Weight Report Analyzer -----------------
+def analyze_weight_report(image_url):
+    """
+    Sends weight/body composition report image to GPT and extracts structured JSON.
+    """
+    messages = [
+        {
+            "role": "system",
+            "content": "You are an assistant that extracts structured health metrics from body composition/weight report images and returns JSON."
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": """
+You are analyzing an image of a weight/body composition report.
+
+Extract the following data if available:
+- weight_kg
+- BMI
+- body_fat_percentage
+- body_fat_weight_kg
+- skeletal_muscle_mass_percentage
+- skeletal_muscle_weight_kg
+- muscle_percentage
+- muscle_weight_kg
+- visceral_fat
+- water_percentage
+- weight_of_water_kg
+- metabolism_kcal_per_day
+
+Also generate diagnoses:
+- obesity (true if BMI >= 30 or body_fat_percentage >= 35)
+- high_visceral_fat (true if visceral fat > 10)
+- low_water_percentage (true if water_percentage < 50)
+- high_metabolism (true if metabolism_kcal_per_day > 1500)
+
+Return ONLY valid JSON in this format:
+{
+  "data": {
+    "patient_info": {
+      "weight_kg": 90.1,
+      "BMI": 31.2,
+      "body_fat_percentage": 43.1,
+      "body_fat_weight_kg": 38.8,
+      "skeletal_muscle_mass_percentage": 31.5,
+      "skeletal_muscle_weight_kg": 28.4,
+      "muscle_percentage": 51.5,
+      "muscle_weight_kg": 46.4,
+      "visceral_fat": 11.5,
+      "water_percentage": 43.4,
+      "weight_of_water_kg": 39.1,
+      "metabolism_kcal_per_day": 1567.4
+    },
+    "diagnoses": {
+      "obesity": true,
+      "high_visceral_fat": true,
+      "low_water_percentage": true,
+      "high_metabolism": true
+    }
+  }
+}
+Do NOT add explanations or extra text.
+"""
+                },
+                {"type": "image_url", "image_url": {"url": image_url}}
+            ]
+        }
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",  # faster/cheaper model for JSON extraction
+        messages=messages,
+        temperature=0
+    )
+
+    # Ensure response is JSON
+    try:
+        return json.loads(response["choices"][0]["message"]["content"])
+    except Exception as e:
+        return {"error": f"Failed to parse JSON: {str(e)}"}
+
+# ----------------- New API endpoint -----------------
+@app.route("/analyze-weight", methods=["POST"])
+def analyze_weight():
+    data = request.json
+    image_url = data.get("image_url")
+
+    if not image_url:
+        return jsonify({"status": "error", "message": "Missing 'image_url'"}), 400
+
+    result = analyze_weight_report(image_url)
+    return jsonify({"status": "success", "result": result})
+
 # Main endpoint
 @app.route("/webhook", methods=["POST"])
 def webhook():
