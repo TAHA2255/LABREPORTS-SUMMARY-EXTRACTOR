@@ -229,16 +229,29 @@ Do NOT add explanations or extra text.
         return {"error": f"Failed to parse JSON: {str(e)}"}
 
 # ----------------- New API endpoint -----------------
+# ----------------- New API endpoint -----------------
 @app.route("/analyze-weight", methods=["POST"])
 def analyze_weight():
     data = request.json
-    image_url = data.get("image_url")
+    input_url = data.get("url") or data.get("image_url")  # allow both keys
 
-    if not image_url:
-        return jsonify({"status": "error", "message": "Missing 'image_url'"}), 400
+    if not input_url:
+        return jsonify({"status": "error", "message": "Missing 'url' or 'image_url'"}), 400
 
-    result = analyze_weight_report(image_url)
-    return jsonify({"status": "success", "result": result})
+    # Convert Drive link to direct download
+    download_url = make_direct_download_url(input_url)
+    if not download_url:
+        return jsonify({"status": "error", "message": "Invalid Google Drive link"}), 400
+
+    # Detect type
+    file_type = get_file_type(download_url)
+    if file_type != "image":
+        return jsonify({"status": "error", "message": "Weight analyzer works only with images"}), 400
+
+    # Analyze weight/body composition
+    result = analyze_weight_report(download_url)
+    return jsonify({"status": "success", "type": "image", "result": result})
+
 
 # Main endpoint
 @app.route("/webhook", methods=["POST"])
