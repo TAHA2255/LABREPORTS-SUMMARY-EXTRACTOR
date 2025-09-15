@@ -159,14 +159,17 @@ def analyze_pdf_text(pdf_url):
 
 
 # ----------------- NEW Weight Report Analyzer -----------------
+# ----------------- NEW Weight Report Analyzer -----------------
 def analyze_weight_report(image_url):
     """
     Sends weight/body composition report image to GPT and extracts structured JSON.
+    Works with any report format by dynamically extracting all available fields.
     """
+
     messages = [
         {
             "role": "system",
-            "content": "You are an assistant that extracts structured health metrics from body composition/weight report images and returns JSON."
+            "content": "You are an assistant that extracts structured health metrics from body composition/weight analysis images and returns clean JSON."
         },
         {
             "role": "user",
@@ -176,48 +179,32 @@ def analyze_weight_report(image_url):
                     "text": """
 You are analyzing an image of a weight/body composition report.
 
-Extract the following data if available:
-- weight_kg
-- BMI
-- body_fat_percentage
-- body_fat_weight_kg
-- skeletal_muscle_mass_percentage
-- skeletal_muscle_weight_kg
-- muscle_percentage
-- muscle_weight_kg
-- visceral_fat
-- water_percentage
-- weight_of_water_kg
-- metabolism_kcal_per_day
-
-Also generate diagnoses:
-- obesity (true if BMI >= 30 or body_fat_percentage >= 35)
-- high_visceral_fat (true if visceral fat > 10)
-- low_water_percentage (true if water_percentage < 50)
-- high_metabolism (true if metabolism_kcal_per_day > 1500)
+Rules:
+1. Extract **all available fields** exactly as they appear in the report (e.g., weight, BMI, fat %, fat mass, bone density, water %, visceral fat, muscle %, muscle mass, metabolic rate, etc.).
+2. Store them under `patient_info` as key-value pairs in **snake_case**. 
+   Example: "Body Fat %" → "body_fat_percentage".
+3. Values should be numbers when possible. Keep units out of values, just numeric.
+4. If a field is missing, simply do not include it.
+5. Add a `diagnoses` section with booleans if you can infer:
+   - obesity (true if BMI >= 30 or body_fat_percentage >= 35)
+   - high_visceral_fat (true if visceral_fat > 10)
+   - low_water_percentage (true if water_percentage < 50)
+   - high_metabolism (true if metabolism_kcal_per_day > 1500)
+   If the required field is not available, omit that diagnosis.
 
 Return ONLY valid JSON in this format:
 {
   "data": {
     "patient_info": {
-      "weight_kg": 90.1,
-      "BMI": 31.2,
-      "body_fat_percentage": 43.1,
-      "body_fat_weight_kg": 38.8,
-      "skeletal_muscle_mass_percentage": 31.5,
-      "skeletal_muscle_weight_kg": 28.4,
-      "muscle_percentage": 51.5,
-      "muscle_weight_kg": 46.4,
-      "visceral_fat": 11.5,
-      "water_percentage": 43.4,
-      "weight_of_water_kg": 39.1,
-      "metabolism_kcal_per_day": 1567.4
+      "field1": value,
+      "field2": value,
+      ...
     },
     "diagnoses": {
-      "obesity": true,
-      "high_visceral_fat": true,
-      "low_water_percentage": true,
-      "high_metabolism": true
+      "obesity": true/false,
+      "high_visceral_fat": true/false,
+      "low_water_percentage": true/false,
+      "high_metabolism": true/false
     }
   }
 }
@@ -230,7 +217,7 @@ Do NOT add explanations or extra text.
     ]
 
     response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # faster/cheaper model for JSON extraction
+        model="gpt-4o-mini",
         messages=messages,
         temperature=0
     )
