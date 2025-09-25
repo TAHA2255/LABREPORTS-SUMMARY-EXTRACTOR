@@ -30,6 +30,16 @@ def make_direct_download_url(url):
         return None
     return f"https://drive.google.com/uc?export=download&id={file_id}"
 
+def make_direct_download_url2(url):
+    if "id=" in url:
+        file_id = url.split("id=")[1]
+    elif "/d/" in url:
+        file_id = url.split("/d/")[1].split("/")[0]
+    else:
+        return None
+    return f"https://drive.google.com/uc?export=download&id={file_id}"
+
+
 # Check content type (PDF or Image)
 def get_content_type(download_url):
     try:
@@ -239,7 +249,7 @@ def analyze_weight():
         return jsonify({"status": "error", "message": "Missing 'url' or 'image_url'"}), 400
 
     # Convert Google Drive link to direct download
-    download_url = make_direct_download_url(input_url)
+    download_url = make_direct_download_url2(input_url)
     if not download_url:
         return jsonify({"status": "error", "message": "Invalid Google Drive link"}), 400
 
