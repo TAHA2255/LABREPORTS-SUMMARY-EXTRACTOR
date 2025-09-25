@@ -165,6 +165,12 @@ def analyze_weight_report(image_url):
     Sends weight/body composition report image to GPT and extracts structured JSON.
     Works with any report format by dynamically extracting all available fields.
     """
+        # Download image bytes
+    response = requests.get(image_url)
+    if response.status_code != 200:
+        return {"error": "Failed to download image"}
+
+    image_bytes = io.BytesIO(response.content)
 
     messages = [
         {
@@ -219,7 +225,8 @@ Do NOT add explanations or extra text.
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
         messages=messages,
-        temperature=0
+        temperature=0,
+        files=[("image", ("report.jpg", image_bytes, "image/jpeg"))]  # <-- send raw image
     )
 
     # Ensure response is JSON
@@ -228,25 +235,22 @@ Do NOT add explanations or extra text.
     except Exception as e:
         return {"error": f"Failed to parse JSON: {str(e)}"}
 
+
+
 # ----------------- New API endpoint -----------------
 # ----------------- New API endpoint -----------------
 @app.route("/analyze-weight", methods=["POST"])
 def analyze_weight():
     data = request.json
-    input_url = data.get("url") or data.get("image_url")  # allow both keys
+    input_url = data.get("url") or data.get("image_url")
 
     if not input_url:
         return jsonify({"status": "error", "message": "Missing 'url' or 'image_url'"}), 400
 
-    # Convert Drive link to direct download
+    # Convert Google Drive link to direct download
     download_url = make_direct_download_url(input_url)
     if not download_url:
         return jsonify({"status": "error", "message": "Invalid Google Drive link"}), 400
-
-    # Detect type
-    file_type = get_file_type(download_url)
-    if file_type != "image":
-        return jsonify({"status": "error", "message": "Weight analyzer works only with images"}), 400
 
     # Analyze weight/body composition
     result = analyze_weight_report(download_url)
