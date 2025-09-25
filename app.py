@@ -160,80 +160,71 @@ def analyze_pdf_text(pdf_url):
 
 # ----------------- NEW Weight Report Analyzer -----------------
 # ----------------- NEW Weight Report Analyzer -----------------
+import base64
+
 def analyze_weight_report(image_url):
     """
-    Sends weight/body composition report image to GPT and extracts structured JSON.
-    Works with any report format by dynamically extracting all available fields.
+    Downloads the image, converts it to base64, and sends it to GPT-4o-mini.
     """
-        # Download image bytes
-    response = requests.get(image_url)
-    if response.status_code != 200:
-        return {"error": "Failed to download image"}
+    try:
+        # Download image
+        response = requests.get(image_url)
+        if response.status_code != 200:
+            return {"error": "Failed to download image"}
 
-    image_bytes = io.BytesIO(response.content)
+        # Convert to base64
+        image_base64 = base64.b64encode(response.content).decode("utf-8")
+        image_data_url = f"data:image/jpeg;base64,{image_base64}"
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are an assistant that extracts structured health metrics from body composition/weight analysis images and returns clean JSON."
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": """
+        # Build messages
+        messages = [
+            {
+                "role": "system",
+                "content": "You are an assistant that extracts structured health metrics from body composition/weight analysis images and returns clean JSON."
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": """
 You are analyzing an image of a weight/body composition report.
 
 Rules:
-1. Extract **all available fields** exactly as they appear in the report (e.g., weight, BMI, fat %, fat mass, bone density, water %, visceral fat, muscle %, muscle mass, metabolic rate, etc.).
-2. Store them under `patient_info` as key-value pairs in **snake_case**. 
-   Example: "Body Fat %" → "body_fat_percentage".
-3. Values should be numbers when possible. Keep units out of values, just numeric.
-4. If a field is missing, simply do not include it.
+1. Extract all available fields exactly as they appear in the report (weight, BMI, fat %, fat mass, water %, visceral fat, etc.).
+2. Store them under `patient_info` in snake_case.
+3. Values should be numbers when possible (strip units).
+4. If a field is missing, skip it.
 5. Add a `diagnoses` section with booleans if you can infer:
-   - obesity (true if BMI >= 30 or body_fat_percentage >= 35)
-   - high_visceral_fat (true if visceral_fat > 10)
-   - low_water_percentage (true if water_percentage < 50)
-   - high_metabolism (true if metabolism_kcal_per_day > 1500)
-   If the required field is not available, omit that diagnosis.
+   - obesity (BMI >= 30 or body_fat_percentage >= 35)
+   - high_visceral_fat (visceral_fat > 10)
+   - low_water_percentage (water_percentage < 50)
+   - high_metabolism (metabolism_kcal_per_day > 1500)
 
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON:
 {
   "data": {
-    "patient_info": {
-      "field1": value,
-      "field2": value,
-      ...
-    },
-    "diagnoses": {
-      "obesity": true/false,
-      "high_visceral_fat": true/false,
-      "low_water_percentage": true/false,
-      "high_metabolism": true/false
-    }
-  }
-}
-Do NOT add explanations or extra text.
+    "patient_info": {...},
+    "diagnoses": {...}
+  }}
 """
-                },
-                {"type": "image_url", "image_url": {"url": image_url}}
-            ]
-        }
-    ]
+                    },
+                    {"type": "image_url", "image_url": {"url": image_data_url}}
+                ]
+            }
+        ]
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0,
-        files=[("image", ("report.jpg", image_bytes, "image/jpeg"))]  # <-- send raw image
-    )
+        # Call OpenAI
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0
+        )
 
-    # Ensure response is JSON
-    try:
         return json.loads(response["choices"][0]["message"]["content"])
+
     except Exception as e:
-        return {"error": f"Failed to parse JSON: {str(e)}"}
+        return {"error": str(e)}
 
 
 
