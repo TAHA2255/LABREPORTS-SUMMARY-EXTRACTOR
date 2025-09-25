@@ -177,14 +177,28 @@ def analyze_weight_report(image_url):
     Downloads the image, converts it to base64, and sends it to GPT-4o-mini.
     """
     try:
-        # Download image
+        # Step 1: Download the image file
         response = requests.get(image_url)
         if response.status_code != 200:
-            return {"error": "Failed to download image"}
+            return {"error": f"Failed to download image: {response.status_code}"}
+
+        # Step 2: Detect type (default to jpeg if unknown)
+        content_type = response.headers.get("Content-Type", "").lower()
+        if "png" in content_type:
+            mime = "image/png"
+        elif "jpeg" in content_type or "jpg" in content_type:
+            mime = "image/jpeg"
+        elif "webp" in content_type:
+            mime = "image/webp"
+        elif "gif" in content_type:
+            mime = "image/gif"
+        else:
+            mime = "image/jpeg"
+
 
         # Convert to base64
         image_base64 = base64.b64encode(response.content).decode("utf-8")
-        image_data_url = f"data:image/png;base64,{image_base64}"
+        image_data_url = f"data:{mime};base64,{image_base64}"
 
         # Build messages
         messages = [
