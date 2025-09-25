@@ -184,7 +184,7 @@ def analyze_weight_report(image_url):
 
         # Convert to base64
         image_base64 = base64.b64encode(response.content).decode("utf-8")
-        image_data_url = f"data:image/jpeg;base64,{image_base64}"
+        image_data_url = f"data:image/png;base64,{image_base64}"
 
         # Build messages
         messages = [
