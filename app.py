@@ -8,9 +8,11 @@ import requests
 import fitz  # PyMuPDF
 import io
 
+
 # Load OpenAI API key
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+#openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = "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"
 
 app = Flask(__name__)
 
@@ -170,11 +172,14 @@ def analyze_pdf_text(pdf_url):
 
 # ----------------- NEW Weight Report Analyzer -----------------
 # ----------------- NEW Weight Report Analyzer -----------------
-import base64
+
+import base64, json, re
+
 
 def analyze_weight_report(image_url):
     """
     Downloads the image, converts it to base64, and sends it to GPT-4o-mini.
+    Works with openai==0.28 and extracts clean JSON safely.
     """
     try:
         # Step 1: Download the image file
@@ -195,7 +200,6 @@ def analyze_weight_report(image_url):
         else:
             mime = "image/jpeg"
 
-
         # Convert to base64
         image_base64 = base64.b64encode(response.content).decode("utf-8")
         image_data_url = f"data:{mime};base64,{image_base64}"
@@ -204,7 +208,7 @@ def analyze_weight_report(image_url):
         messages = [
             {
                 "role": "system",
-                "content": "You are an assistant that extracts structured health metrics from body composition/weight analysis images and returns clean JSON."
+                "content": "You are an assistant that extracts structured health metrics from body composition/weight analysis images and returns clean JSON only."
             },
             {
                 "role": "user",
@@ -225,12 +229,7 @@ Rules:
    - low_water_percentage (water_percentage < 50)
    - high_metabolism (metabolism_kcal_per_day > 1500)
 
-Return ONLY valid JSON:
-{
-  "data": {
-    "patient_info": {...},
-    "diagnoses": {...}
-  }}
+Return ONLY valid JSON.
 """
                     },
                     {"type": "image_url", "image_url": {"url": image_data_url}}
@@ -238,14 +237,25 @@ Return ONLY valid JSON:
             }
         ]
 
-        # Call OpenAI
+        # Call OpenAI (old SDK syntax)
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=messages,
             temperature=0
         )
 
-        return json.loads(response["choices"][0]["message"]["content"])
+        # Extract raw model output
+        content = response["choices"][0]["message"]["content"]
+
+        # 🔑 Extract JSON substring safely
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if not match:
+            return {"error": "No JSON found in model response", "raw_output": content}
+
+        json_str = match.group(0)
+
+        # Parse and return JSON
+        return json.loads(json_str)
 
     except Exception as e:
         return {"error": str(e)}
@@ -304,3 +314,6 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run("0.0.0.0", port=port)
+
+
+#{"image_url":"https://drive.google.com/open?id=1kMC-iEyN2lsdXmA8kkWIzz3kQ24PUddA"}
