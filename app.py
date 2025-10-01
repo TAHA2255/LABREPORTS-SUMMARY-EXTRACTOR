@@ -11,8 +11,7 @@ import io
 
 # Load OpenAI API key
 load_dotenv()
-#openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 
